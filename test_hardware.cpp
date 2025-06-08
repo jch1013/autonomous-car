@@ -33,8 +33,10 @@ void loop() {
   // trigger light if within 20cm
   if (distance > 0 && distance < 20) {
     digitalWrite(ledPin, HIGH);
+    esc.write(90);
   } else {
     digitalWrite(ledPin, LOW);
+    esc.write(95);
   }
 
   delay(100);
