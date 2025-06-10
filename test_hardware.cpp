@@ -8,6 +8,8 @@ const int frontEchoPin = 11;
 const int frontTrigPin = 10;
 const float soundSpeed = 0.034;
 
+Servo esc;
+
 
 
 void setup() {
@@ -33,10 +35,10 @@ void loop() {
   // trigger light if within 20cm
   if (distance > 0 && distance < 20) {
     digitalWrite(ledPin, HIGH);
-    esc.write(90);
+    esc.digitalWrite(1500);
   } else {
     digitalWrite(ledPin, LOW);
-    esc.write(95);
+    esc.digitalWrite(1575);
   }
 
   delay(100);
