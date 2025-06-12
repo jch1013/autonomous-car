@@ -1,21 +1,30 @@
-// #include <Servo.h>
+#include <Servo.h>
 
-const int ledPin = 13;         // Built-in LED pin
-int centerPos = 90;      // Center position for servo
-int escPin = 3;
-const int servoPin = 12;
+const int ledPin = 13;
+const int escPin = 3;
 const int frontEchoPin = 11;
 const int frontTrigPin = 10;
-const float soundSpeed = 0.034;
+const float soundSpeed = 0.034; // cm/us
 
 Servo esc;
 
+// Pulse timing settings
+const int forwardSpeed = 1575;      // ESC pulse for forward
+const int neutralSpeed = 1500;      // ESC pulse for neutral
+const unsigned long onTime = 100;   // ms motor ON
+const unsigned long offTime = 200;  // ms motor OFF
 
+// State variables for non-blocking timing
+bool motorOn = false;
+unsigned long lastSwitchTime = 0;
 
 void setup() {
   pinMode(frontTrigPin, OUTPUT);
   pinMode(frontEchoPin, INPUT);
   pinMode(ledPin, OUTPUT);
+  esc.attach(escPin);
+  esc.writeMicroseconds(neutralSpeed); // Arm ESC
+  delay(2000); // Wait for ESC to arm
 }
 
 void sendUltrasonicPulse(int trigPin) {
@@ -26,21 +35,46 @@ void sendUltrasonicPulse(int trigPin) {
   digitalWrite(trigPin, LOW);
 }
 
-void loop() {
-  // Turn LED on
+float readDistance() {
   sendUltrasonicPulse(frontTrigPin);
-  long duration = pulseIn(frontEchoPin, HIGH, 30000); // review this - pulseIn timeout probably can be much less than 1s
-  float distance = duration * 0.034 / 2;
+  long duration = pulseIn(frontEchoPin, HIGH, 30000); // 30ms timeout
+  float distance = duration * soundSpeed / 2.0;
+  return distance;
+}
 
-  // trigger light if within 20cm
-  if (distance > 0 && distance < 20) {
-    digitalWrite(ledPin, HIGH);
-    esc.digitalWrite(1500);
+// Non-blocking drive forward function
+void driveForward() {
+  unsigned long currentMillis = millis();
+
+  if (motorOn) {
+    if (currentMillis - lastSwitchTime >= onTime) {
+      esc.writeMicroseconds(neutralSpeed); // Switch to neutral
+      motorOn = false;
+      lastSwitchTime = currentMillis;
+    }
+    // else: keep running forward
   } else {
-    digitalWrite(ledPin, LOW);
-    esc.digitalWrite(1575);
+    if (currentMillis - lastSwitchTime >= offTime) {
+      esc.writeMicroseconds(forwardSpeed); // Switch to forward
+      motorOn = true;
+      lastSwitchTime = currentMillis;
+    }
+    // else: keep in neutral
   }
+}
 
-  delay(100);
+void loop() {
+  float distance = readDistance();
 
+  if (distance > 0 && distance < 20) {
+    // Obstacle detected: stop and turn LED on
+    digitalWrite(ledPin, HIGH);
+    esc.writeMicroseconds(neutralSpeed); // Stop motor
+    motorOn = false; // Reset state so next pulse starts with ON
+    lastSwitchTime = millis();
+  } else {
+    // No obstacle: pulse forward and turn LED off
+    digitalWrite(ledPin, LOW);
+    driveForward();
+  }
 }
